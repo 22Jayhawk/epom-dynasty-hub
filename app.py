@@ -2,102 +2,122 @@ import streamlit as st
 import pandas as pd
 import requests
 
-# --- SETTINGS ---
+# --- CORE CONFIG ---
 LEAGUE_ID = "1312559657998368768"
 SHEET_ID = "1JhDhOf2Qkhl4dCOmv37GZhJNJqy41E5rOvt9IATfmc8"
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=xlsx"
 NICKNAMES = {"Selkow": "Jared", "Brodack": "Dak"}
 
-st.set_page_config(page_title="EPOM Hub", layout="wide")
+st.set_page_config(page_title="EPOM Dynasty", layout="wide")
 
-# --- CLEAN DESIGN CSS ---
+# --- CUSTOM CSS (THE DESIGN OVERHAUL) ---
 st.markdown("""
     <style>
-    .stApp { background-color: #0E1117; color: #FFFFFF; }
-    [data-testid="stMetric"] { 
-        background-color: #161B22; 
-        border: 1px solid #30363D; 
-        padding: 15px; 
-        border-radius: 10px; 
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;700;800&display=swap');
+    
+    html, body, [class*="css"] { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #050505; }
+    .stApp { background: #050505; }
+    
+    /* GLASS CARDS */
+    .glass-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 20px;
+        padding: 24px;
+        margin-bottom: 20px;
     }
-    .manager-row {
+    
+    /* STANDINGS ROW */
+    .standings-row {
         display: flex;
         justify-content: space-between;
-        padding: 15px;
-        margin: 10px 0;
-        background: #1C2128;
-        border-left: 5px solid #58A6FF;
-        border-radius: 8px;
+        align-items: center;
+        padding: 16px 24px;
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 12px;
+        margin-bottom: 8px;
+        transition: 0.3s ease;
     }
-    .name-text { font-size: 20px; font-weight: bold; color: #F0F6FC; }
-    .stat-text { color: #8B949E; font-size: 14px; }
-    .val-text { color: #58A6FF; font-weight: bold; font-size: 18px; }
+    .standings-row:hover { background: rgba(255, 255, 255, 0.05); border: 1px solid #4F46E5; }
+    
+    .rank-circle {
+        height: 32px; width: 32px; border-radius: 50%;
+        background: #4F46E5; display: flex; align-items: center;
+        justify-content: center; font-weight: 800; font-size: 14px; margin-right: 15px;
+    }
+    
+    /* TYPOGRAPHY */
+    .hero-text { font-size: 4rem; font-weight: 800; letter-spacing: -2px; color: white; margin-bottom: 0; }
+    .accent-text { color: #4F46E5; font-weight: 700; }
+    .label { color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+    .val { color: #f8fafc; font-size: 18px; font-weight: 700; }
+
+    /* HIDE STREAMLIT BOREDOM */
+    [data-testid="stHeader"], [data-testid="stFooter"] { display: none; }
+    .stTabs [data-baseweb="tab-list"] { background: transparent; gap: 30px; }
+    .stTabs [data-baseweb="tab"] { background: transparent; border: none; font-size: 18px; color: #64748b; }
+    .stTabs [aria-selected="true"] { color: white !important; font-weight: 700; border-bottom: 2px solid #4F46E5 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- SECURE DATA FETCHING ---
+# --- DATA ---
 @st.cache_data(ttl=600)
-def get_data():
+def load_league():
     try:
         u = requests.get(f"https://api.sleeper.app/v1/league/{LEAGUE_ID}/users").json()
         r = requests.get(f"https://api.sleeper.app/v1/league/{LEAGUE_ID}/rosters").json()
         umap = {user['user_id']: NICKNAMES.get(user['display_name'], user['display_name']) for user in u}
-        
-        standings = []
+        data = []
         for ros in r:
             pf = ros['settings']['fpts'] + (ros['settings']['fpts_decimal'] / 100)
-            standings.append({
-                "Manager": umap.get(ros['owner_id'], "Unknown"),
-                "Record": f"{ros['settings']['wins']}-{ros['settings']['losses']}",
-                "PF": round(pf, 2)
-            })
-        return sorted(standings, key=lambda x: x['PF'], reverse=True)
-    except:
-        return []
+            data.append({"Manager": umap.get(ros['owner_id']), "Record": f"{ros['settings']['wins']}-{ros['settings']['losses']}", "PF": round(pf, 1)})
+        return sorted(data, key=lambda x: x['PF'], reverse=True)
+    except: return []
 
 @st.cache_data(ttl=60)
-def get_sheets():
-    try: return pd.read_excel(SHEET_URL, sheet_name=None)
-    except: return {}
+def load_sheets():
+    return pd.read_excel(SHEET_URL, sheet_name=None)
 
-# --- BUILD UI ---
-st.title("🏆 EPOM DYNASTY HUB")
+# --- APP ---
+st.markdown('<h1 class="hero-text">EPOM<span class="accent-text">.</span></h1>', unsafe_allow_html=True)
+st.markdown('<p style="color: #64748b; margin-left: 5px;">DYNASTY LEAGUE HUB</p>', unsafe_allow_html=True)
 
-data = get_data()
-sheets = get_sheets()
+data = load_league()
+sheets = load_sheets()
 
+# TOP BAR CARDS
 if data:
-    # Top 3 Metrics
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Points Leader", data[0]['Manager'], f"{data[0]['PF']} PF")
-    m2.metric("Second Place", data[1]['Manager'], f"{data[1]['PF']} PF")
-    m3.metric("League Median", f"{round(sum(d['PF'] for d in data)/len(data), 1)}")
+    c1, c2, c3 = st.columns(3)
+    with c1: st.markdown(f'<div class="glass-card"><p class="label">Points Leader</p><p class="val">{data[0]["Manager"]}</p></div>', unsafe_allow_html=True)
+    with c2: st.markdown(f'<div class="glass-card"><p class="label">Total PF</p><p class="val">{data[0]["PF"]}</p></div>', unsafe_allow_html=True)
+    with c3: st.markdown(f'<div class="glass-card"><p class="label">Season</p><p class="val">2025/26</p></div>', unsafe_allow_html=True)
 
-    st.write("---")
+tab1, tab2, tab3 = st.tabs(["Standings", "History", "Drafts"])
 
-    t1, t2, t3 = st.tabs(["🔥 STANDINGS", "📜 HISTORY", "📅 DRAFTS"])
-
-    with t1:
-        for entry in data:
-            st.markdown(f"""
-                <div class="manager-row">
-                    <div class="name-text">{entry['Manager']}</div>
-                    <div style="display: flex; gap: 30px;">
-                        <div style="text-align: center;"><div class="stat-text">RECORD</div><div class="val-text">{entry['Record']}</div></div>
-                        <div style="text-align: center;"><div class="stat-text">POINTS</div><div class="val-text">{entry['PF']}</div></div>
-                    </div>
+with tab1:
+    st.write(" ")
+    for i, m in enumerate(data, 1):
+        st.markdown(f"""
+            <div class="standings-row">
+                <div style="display: flex; align-items: center;">
+                    <div class="rank-circle">{i}</div>
+                    <div class="val">{m['Manager']}</div>
                 </div>
-            """, unsafe_allow_html=True)
+                <div style="display: flex; gap: 40px;">
+                    <div style="text-align: right;"><p class="label">Record</p><p class="val">{m['Record']}</p></div>
+                    <div style="text-align: right;"><p class="label">PF</p><p class="val" style="color:#4F46E5;">{m['PF']}</p></div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 
-    with t2:
-        sn = "Champs, Chumps and Oh So Close"
-        if sn in sheets:
-            st.dataframe(sheets[sn].replace(NICKNAMES), use_container_width=True, hide_index=True)
+with tab2:
+    sn = "Champs, Chumps and Oh So Close"
+    if sn in sheets:
+        # Style the dataframe minimally to keep the look
+        st.dataframe(sheets[sn].replace(NICKNAMES), use_container_width=True, hide_index=True)
 
-    with t3:
-        years = [s for s in sheets.keys() if "20" in s and s != sn]
-        y = st.selectbox("Select Year", sorted(years, reverse=True))
-        if y:
-            st.dataframe(sheets[y].replace(NICKNAMES), use_container_width=True, hide_index=True)
-else:
-    st.error("League data failed to load. Check Sleeper ID.")
+with tab3:
+    years = [s for s in sheets.keys() if "20" in s and s != sn]
+    y = st.selectbox("Draft Year", sorted(years, reverse=True))
+    if y:
+        st.dataframe(sheets[y].replace(NICKNAMES), use_container_width=True, hide_index=True)
